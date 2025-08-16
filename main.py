@@ -37,11 +37,13 @@ async def serve_frontend():
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
 # Helper funtion to show last 25 words of string s
 def last_n_words(s, n=100):
     s = str(s)
     words = s.split()
-    return ' '.join(words[-n:])
+    return " ".join(words[-n:])
+
 
 def is_csv_empty(csv_path):
     return not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0
@@ -52,7 +54,7 @@ def is_base64_image(s: str) -> bool:
     if s.startswith("data:image"):
         return True
     # heuristic: long base64-looking string
-    if len(s) > 100 and re.fullmatch(r'[A-Za-z0-9+/=]+', s):
+    if len(s) > 100 and re.fullmatch(r"[A-Za-z0-9+/=]+", s):
         return True
     return False
 
@@ -71,13 +73,14 @@ def strip_base64_from_json(data: dict) -> dict:
 
 
 # Pre-created venv paths (point to the python executable inside each venv)
-VENV_PATHS = [
-    "venv/bin/python3",
-    "venv1/bin/python3",
-    "venv2/bin/python3"
-]
-
+# VENV_PATHS = [
+#     "venv/bin/python3",
+#     "venv1/bin/python3",
+#     "venv2/bin/python3"
+# ]
+VENV_PATHS = ["python3"]
 venv_cycle = itertools.cycle(VENV_PATHS)
+
 
 @app.post("/api")
 async def analyze(request: Request):
@@ -88,8 +91,6 @@ async def analyze(request: Request):
 
     # Setting up file for llm response
     llm_response_file_path = os.path.join(request_folder, "llm_response.txt")
-
-    
 
     # Setup logging for this request
     log_path = os.path.join(request_folder, "app.log")
@@ -134,7 +135,9 @@ async def analyze(request: Request):
         file_names = list(saved_files.keys())
 
         # Find the closest matching filename
-        closest_matches = difflib.get_close_matches(target_name, file_names, n=1, cutoff=0.6)
+        closest_matches = difflib.get_close_matches(
+            target_name, file_names, n=1, cutoff=0.6
+        )
         if closest_matches:
             selected_file_key = closest_matches[0]
         else:
@@ -191,8 +194,7 @@ You must always answer in **valid JSON** like this:
 - Use only necessary pip-installable external libraries.  
 """
 
-
-    question_text = str("<question>") +  question_text+ "</question>"  + str(user_prompt)
+    question_text = str("<question>") + question_text + "</question>" + str(user_prompt)
     logger.info("Step-2: File sent %s", saved_files)
 
     """
@@ -212,21 +214,28 @@ You must always answer in **valid JSON** like this:
     attempt = 0
     response = None
     error_occured = 0
-    
+
     while attempt < max_attempts:
-        logger.info("🤖 Step-1: Getting scrap code and metadata from llm. Tries count = %d", attempt)
+        logger.info(
+            "🤖 Step-1: Getting scrap code and metadata from llm. Tries count = %d",
+            attempt,
+        )
         try:
             if error_occured == 0:
                 response = await parse_question_with_llm(
-                            question_text=question_text,
-                            uploaded_files=saved_files,
-                            folder=request_folder,
-                            session_id=session_id,
-                            retry_message=retry_message
-                        )
+                    question_text=question_text,
+                    uploaded_files=saved_files,
+                    folder=request_folder,
+                    session_id=session_id,
+                    retry_message=retry_message,
+                )
             else:
                 logger.info("🤖 Step-1: Retrying with error message: %s", retry_message)
-                response = await parse_question_with_llm(retry_message=retry_message, folder=request_folder, session_id=request_id)
+                response = await parse_question_with_llm(
+                    retry_message=retry_message,
+                    folder=request_folder,
+                    session_id=request_id,
+                )
             # Check if response is a valid dict (parsed JSON)
             if isinstance(response, dict):
                 logger.info("🤖 Step-1: Successfully parsed response from LLM.")
@@ -234,27 +243,32 @@ You must always answer in **valid JSON** like this:
         except Exception as e:
             error_occured = 1
             retry_message = (
-    "⚠️ The previous response was not valid JSON.\n"
-    "Your task: Fix the issue and return a STRICTLY valid JSON object.\n"
-    "Do not include explanations, text, or comments — only JSON.\n\n"
-    "Error details (last 100 words):\n<error>"
-    + last_n_words(str(e), 100) +
-    "</error>\n\n"
-    "Expected JSON format:\n"
-    "{\n"
-    '   "code": "<python_code_here_to_run_in_REPL>",\n'
-    '   "libraries": ["list", "of", "external_libraries"],\n'
-    '   "run_this": 0 or 1\n'
-    "}"
-)
+                "⚠️ The previous response was not valid JSON.\n"
+                "Your task: Fix the issue and return a STRICTLY valid JSON object.\n"
+                "Do not include explanations, text, or comments — only JSON.\n\n"
+                "Error details (last 100 words):\n<error>"
+                + last_n_words(str(e), 100)
+                + "</error>\n\n"
+                "Expected JSON format:\n"
+                "{\n"
+                '   "code": "<python_code_here_to_run_in_REPL>",\n'
+                '   "libraries": ["list", "of", "external_libraries"],\n'
+                '   "run_this": 0 or 1\n'
+                "}"
+            )
 
             logger.error("❌🤖 Step-1: Error in parsing the result. %s", retry_message)
         attempt += 1
 
-
     if not isinstance(response, dict):
-        logger.error("❌🤖 Step-1: Could not get valid response from LLM after retries.")
-        return JSONResponse({"message": "Error_first_llm_call: Could not get valid response from LLM after retries."})
+        logger.error(
+            "❌🤖 Step-1: Could not get valid response from LLM after retries."
+        )
+        return JSONResponse(
+            {
+                "message": "Error_first_llm_call: Could not get valid response from LLM after retries."
+            }
+        )
 
     # Extract code, libraries, and run_this from the response
     code_to_run = response.get("code", "")
@@ -272,17 +286,25 @@ You must always answer in **valid JSON** like this:
 
         logger.info(f"💻 Loop-{loop_counter}: Running LLM code.")
         # Step 2: Run the generated code
-        execution_result =await run_python_code(
+        execution_result = await run_python_code(
             code=code_to_run,
             libraries=required_libraries,
             folder=request_folder,
-            python_exec=python_exec
+            python_exec=python_exec,
         )
 
         # Step 3: Check if execution failed
         if execution_result["code"] == 0:
-            logger.error(f"❌💻 Loop-{loop_counter}: Code execution failed: %s", last_n_words(execution_result["output"]))
-            retry_message =str("<error_snippet>") + last_n_words(execution_result["output"]) + str("</error_snippet>") +str("Solve this error or give me new freash code")
+            logger.error(
+                f"❌💻 Loop-{loop_counter}: Code execution failed: %s",
+                last_n_words(execution_result["output"]),
+            )
+            retry_message = (
+                str("<error_snippet>")
+                + last_n_words(execution_result["output"])
+                + str("</error_snippet>")
+                + str("Solve this error or give me new freash code")
+            )
         else:
             logger.info(f"✅💻 Loop-{loop_counter}: Code executed successfully.")
             # Read metadata
@@ -290,11 +312,11 @@ You must always answer in **valid JSON** like this:
             if not os.path.exists(metadata_file):
                 print("❌📁 metadata.txt not found.")
                 continue
-            
+
             with open(metadata_file, "r") as f:
                 metadata = f.read()
-            retry_message =str("<metadata>") + metadata + str("</metadata>")
-        
+            retry_message = str("<metadata>") + metadata + str("</metadata>")
+
         # Checking if result.txt exists
         result_file = os.path.join(request_folder, "result.txt")
         result_path = os.path.join(request_folder, "result.json")
@@ -344,36 +366,47 @@ You must always answer in **valid JSON** like this:
                             uploaded_files=saved_files,
                             folder=request_folder,
                             session_id=session_id,
-                            )
+                        )
                     else:
-                        logger.error(f"❌🤖 Loop-{loop_counter}: Invalid json response. %s", retry_message)
-                        verification = await parse_question_with_llm(retry_message=retry_message, folder=request_folder, session_id=request_id)
+                        logger.error(
+                            f"❌🤖 Loop-{loop_counter}: Invalid json response. %s",
+                            retry_message,
+                        )
+                        verification = await parse_question_with_llm(
+                            retry_message=retry_message,
+                            folder=request_folder,
+                            session_id=request_id,
+                        )
                     # Check if response is a valid dict (parsed JSON)
                     if isinstance(verification, dict):
                         break
                 except Exception as e:
                     error_occured = 1
                     retry_message = (
-        "⚠️ The previous response was not valid JSON.\n"
-        "Your task: Fix the issue and return a STRICTLY valid JSON object.\n"
-        "Do not include explanations, text, or comments — only JSON.\n\n"
-        "Error details (last 100 words):\n<error>"
-        + last_n_words(str(e), 100) +
-        "</error>\n\n"
-        "Expected JSON format:\n"
-        "{\n"
-        '   "code": "<python_code_here_to_run_in_REPL>",\n'
-        '   "libraries": ["list", "of", "external_libraries"],\n'
-        '   "run_this": 0 or 1\n'
-        "}"
-    )
+                        "⚠️ The previous response was not valid JSON.\n"
+                        "Your task: Fix the issue and return a STRICTLY valid JSON object.\n"
+                        "Do not include explanations, text, or comments — only JSON.\n\n"
+                        "Error details (last 100 words):\n<error>"
+                        + last_n_words(str(e), 100)
+                        + "</error>\n\n"
+                        "Expected JSON format:\n"
+                        "{\n"
+                        '   "code": "<python_code_here_to_run_in_REPL>",\n'
+                        '   "libraries": ["list", "of", "external_libraries"],\n'
+                        '   "run_this": 0 or 1\n'
+                        "}"
+                    )
 
-                    logger.error(f"❌🤖 Loop-{loop_counter}: Error in parsing the result. %s", retry_message)
+                    logger.error(
+                        f"❌🤖 Loop-{loop_counter}: Error in parsing the result. %s",
+                        retry_message,
+                    )
                 attempt += 1
 
-
             if not isinstance(verification, dict):
-                logger.error(f"❌🤖 Loop-{loop_counter}: Error: Could not get valid response for validation response.")
+                logger.error(
+                    f"❌🤖 Loop-{loop_counter}: Error: Could not get valid response for validation response."
+                )
                 print(verification)
                 runner = 0
                 break
@@ -383,12 +416,15 @@ You must always answer in **valid JSON** like this:
                 required_libraries = verification.get("libraries", [])
                 runner = verification.get("run_this", 0)  # Assume False if not provided
                 if runner == 1:
-                    logger.info(f"💻 Loop-{loop_counter}: Re-running code as per validation result.")
+                    logger.info(
+                        f"💻 Loop-{loop_counter}: Re-running code as per validation result."
+                    )
                     continue
                 else:
-                    logger.info(f"✅ Loop-{loop_counter}: Validation successful, no re-run needed.")
+                    logger.info(
+                        f"✅ Loop-{loop_counter}: Validation successful, no re-run needed."
+                    )
                     break
-        
 
         # Loops to ensure we get a valid json reponse
         max_attempts = 3
@@ -401,64 +437,80 @@ You must always answer in **valid JSON** like this:
             try:
                 if error_occured == 0:
                     response = await parse_question_with_llm(
-                    retry_message=retry_message,
-                    folder=request_folder,
-                    session_id=session_id
+                        retry_message=retry_message,
+                        folder=request_folder,
+                        session_id=session_id,
                     )
                 else:
-                    logger.error(f"❌🤖 Loop-{loop_counter}: Invalid json response. %s", retry_message)
-                    response = await parse_question_with_llm(retry_message=retry_message, folder=request_folder, session_id=request_id)
+                    logger.error(
+                        f"❌🤖 Loop-{loop_counter}: Invalid json response. %s",
+                        retry_message,
+                    )
+                    response = await parse_question_with_llm(
+                        retry_message=retry_message,
+                        folder=request_folder,
+                        session_id=request_id,
+                    )
                 # Check if response is a valid dict (parsed JSON)
                 if isinstance(response, dict):
                     break
             except Exception as e:
                 error_occured = 1
                 retry_message = (
-    "⚠️ The previous response was not valid JSON.\n"
-    "Your task: Fix the issue and return a STRICTLY valid JSON object.\n"
-    "Do not include explanations, text, or comments — only JSON.\n\n"
-    "Error details (last 100 words):\n<error>"
-    + last_n_words(str(e), 100) +
-    "</error>\n\n"
-    "Expected JSON format:\n"
-    "{\n"
-    '   "code": "<python_code_here_to_run_in_REPL>",\n'
-    '   "libraries": ["list", "of", "external_libraries"],\n'
-    '   "run_this": 0 or 1\n'
-    "}"
-)
+                    "⚠️ The previous response was not valid JSON.\n"
+                    "Your task: Fix the issue and return a STRICTLY valid JSON object.\n"
+                    "Do not include explanations, text, or comments — only JSON.\n\n"
+                    "Error details (last 100 words):\n<error>"
+                    + last_n_words(str(e), 100)
+                    + "</error>\n\n"
+                    "Expected JSON format:\n"
+                    "{\n"
+                    '   "code": "<python_code_here_to_run_in_REPL>",\n'
+                    '   "libraries": ["list", "of", "external_libraries"],\n'
+                    '   "run_this": 0 or 1\n'
+                    "}"
+                )
 
-                logger.error(f"❌🤖 Loop-{loop_counter}: Error in parsing the result. %s", retry_message)
+                logger.error(
+                    f"❌🤖 Loop-{loop_counter}: Error in parsing the result. %s",
+                    retry_message,
+                )
             attempt += 1
 
-
         if not isinstance(response, dict):
-            logger.error(f"❌🤖 Loop-{loop_counter}: Could not get valid response from LLM after retries.")
-            return JSONResponse({"message": "Error_Inside_loop_call: Could not get valid response from LLM after retries."})
+            logger.error(
+                f"❌🤖 Loop-{loop_counter}: Could not get valid response from LLM after retries."
+            )
+            return JSONResponse(
+                {
+                    "message": "Error_Inside_loop_call: Could not get valid response from LLM after retries."
+                }
+            )
 
         code_to_run = response.get("code", "")
         required_libraries = response.get("libraries", [])
         runner = response.get("run_this", 1)
 
-        
-
     try:
         logger.info(f"💻 Step-6: Running final code.")
-        #Running final code
-        execution_result =await run_python_code(
+        # Running final code
+        execution_result = await run_python_code(
             code=code_to_run,
             libraries=required_libraries,
             folder=request_folder,
-            python_exec=python_exec
+            python_exec=python_exec,
         )
         if execution_result["code"] == 0:
-            logger.error(f"❌💻 Step-6: Final code execution failed: %s", last_n_words(execution_result["output"]))
+            logger.error(
+                f"❌💻 Step-6: Final code execution failed: %s",
+                last_n_words(execution_result["output"]),
+            )
     except Exception as e:
-        logger.error(f"❌💻 Step-6: Error occurred while running final code: %s", last_n_words(e))
+        logger.error(
+            f"❌💻 Step-6: Error occurred while running final code: %s", last_n_words(e)
+        )
 
     # Final step: send the response back by reading the result.txt in JSON format
-
-
 
     result_path = os.path.join(request_folder, "result.json")
 
@@ -478,7 +530,10 @@ You must always answer in **valid JSON** like this:
             with open(result_path, "w") as f:
                 f.write(result)
         except Exception as e:
-            logger.error(f"❌📁 Step-7: Error occurred while writing result.json: %s", last_n_words(e))
+            logger.error(
+                f"❌📁 Step-7: Error occurred while writing result.json: %s",
+                last_n_words(e),
+            )
 
     else:
         with open(result_path, "r") as f:
@@ -488,8 +543,16 @@ You must always answer in **valid JSON** like this:
                 logger.info("✅📁 Step-7: send result back")
                 return JSONResponse(content=data)
             except Exception as e:
-                logger.error(f"❌📁 Step-7: Error occur while sending result: %s", last_n_words(e))
+                logger.error(
+                    f"❌📁 Step-7: Error occur while sending result: %s",
+                    last_n_words(e),
+                )
                 # Return raw content if JSON parsing fails
                 f.seek(0)
                 raw_content = f.read()
-                return JSONResponse({"message": f"Error occured while processing result.json: {e}", "raw_result": raw_content})
+                return JSONResponse(
+                    {
+                        "message": f"Error occured while processing result.json: {e}",
+                        "raw_result": raw_content,
+                    }
+                )
