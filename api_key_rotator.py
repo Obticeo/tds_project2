@@ -1,11 +1,20 @@
 import itertools
 import time
 
+import os
+
+
+# Load API keys from Render environment variables
 API_KEYS = [
-    {"key": "AIzaSyCxO2SP6B9wOQ6dAtte8JWSU3l1w", "req_timestamps": []},
-    {"key": "AIzaSyBxddEHeeSs8ovD4ttk1fo1zxFE", "req_timestamps": []},
-    {"key": "AIzaSyDR6arJs93DInU3DZA29Ltez00", "req_timestamps": []},
+    {"key": os.environ.get("API_KEY_1"), "req_timestamps": []},
+    {"key": os.environ.get("API_KEY_2"), "req_timestamps": []},
+    {"key": os.environ.get("API_KEY_3"), "req_timestamps": []},
 ]
+
+# Example usage
+for api in API_KEYS:
+    print(f"Loaded API key: {api['key']}")
+
 
 key_cycle = itertools.cycle(API_KEYS)
 MAX_REQS_PER_MIN = 5
