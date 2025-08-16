@@ -13,7 +13,7 @@ API_KEYS = [
 
 # Example usage
 for api in API_KEYS:
-    print(f"Loaded API key: {api['key']}")
+    print("Loaded API key")
 
 
 key_cycle = itertools.cycle(API_KEYS)
@@ -23,9 +23,7 @@ MAX_REQS_PER_MIN = 5
 def cleanup_usage(key_info):
     """Remove requests older than 60s."""
     now = time.time()
-    key_info["req_timestamps"] = [
-        t for t in key_info["req_timestamps"] if now - t < 60
-    ]
+    key_info["req_timestamps"] = [t for t in key_info["req_timestamps"] if now - t < 60]
 
 
 def get_api_key(auto_wait=True):
