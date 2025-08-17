@@ -90,7 +90,7 @@ You are an AI Python code generator for multi-step data analysis and processing.
 - Always prefer incremental steps.  
 - Append **only necessary information** to {folder}/metadata.txt to minimize token usage.  
 - Use pip-installable names for external libraries. Built-ins should not be listed.  
-- For image processing, use Python libraries only (no Gemini Vision).  
+- For image processing, use Python libraries only or other gemini model that is working.(no Gemini Vision).  
 """
 
 
